@@ -4,8 +4,10 @@ httpx==0.28.1
 pydantic==2.10.4
 pydantic-settings==2.7.0
 python-dotenv==1.0.1
-# openai 1.60+ 修复了与 httpx 0.28 的 proxies 参数不兼容问题
+
+# openai >= 1.60 is required for httpx 0.28 compatibility (proxies param fix)
 openai>=1.60.0,<3
 
-# 打包为 exe（仅打包时需要，普通运行不需要）
+# PyInstaller is only needed for building the exe (python build.py),
+# not required for running the app via uvicorn / launcher.py
 pyinstaller>=6.10
