@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepoInspector — GitHub repository health, analyzed.</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171717'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <!-- === Nav-bar (64px) === -->
+  <nav class="sub-nav">
+    <div class="sub-nav-inner">
+      <a href="/" class="sub-nav-title">RepoInspector</a>
+      <div class="sub-nav-links">
+        <button type="button" class="nav-text-btn" id="history-btn" aria-label="History">
+          History
+          <span class="settings-dot" id="history-dot" hidden></span>
+        </button>
+        <button type="button" class="nav-text-btn" id="settings-btn" aria-label="Settings">
+          Settings
+          <span class="settings-dot" id="settings-dot" hidden></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- === History Modal === -->
+  <div class="modal-overlay" id="history-modal" hidden>
+    <div class="modal modal-wide" role="dialog" aria-labelledby="history-title" aria-modal="true">
+      <header class="modal-header">
+        <h2 id="history-title">History.</h2>
+        <div class="modal-header-right">
+          <button type="button" class="btn-tertiary" id="history-clear-all">Clear all</button>
+          <button type="button" class="modal-close" id="history-close" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+      <div class="modal-body">
+        <p class="modal-hint" id="history-hint">分析结果会自动保存在当前浏览器中。最长保留 20 条记录，换浏览器或清除浏览器数据将丢失。</p>
+        <div id="history-empty" class="history-empty" hidden>
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <rect x="6" y="4" width="28" height="32" rx="3" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <path d="M11 12h18M11 18h18M11 24h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p>No history yet.</p>
+          <p class="hint">分析一个仓库后会自动出现在这里。</p>
+        </div>
+        <ul id="history-list" class="history-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- === Settings Modal === -->
+  <div class="modal-overlay" id="settings-modal" hidden>
+    <div class="modal" role="dialog" aria-labelledby="settings-title" aria-modal="true">
+      <header class="modal-header">
+        <h2 id="settings-title">Settings.</h2>
+        <button type="button" class="modal-close" id="settings-close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </header>
+      <form id="settings-form" class="modal-body">
+        <p class="modal-hint">以下值仅保存在当前浏览器中，不会上传到服务器。修改后立即生效。</p>
+
+        <div class="form-group">
+          <label for="cfg-github-token">GITHUB_TOKEN <span class="form-optional">optional</span></label>
+          <input id="cfg-github-token" type="password" placeholder="ghp_... · 留空使用系统默认" autocomplete="off" spellcheck="false" />
+          <p class="form-hint">在 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">GitHub Settings → Tokens</a> 生成。配置后可提升到 5000 次/小时。</p>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-llm-api-key">LLM_API_KEY <span class="form-optional">optional</span></label>
+          <input id="cfg-llm-api-key" type="password" placeholder="sk-... · 留空使用系统默认" autocomplete="off" spellcheck="false" />
+          <p class="form-hint">OpenAI 兼容协议的 API Key。当前系统默认使用 SiliconFlow。</p>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-llm-base-url">LLM_BASE_URL</label>
+          <input id="cfg-llm-base-url" type="text" placeholder="https://api.siliconflow.cn/v1" autocomplete="off" spellcheck="false" />
+          <p class="form-hint">兼容 OpenAI 协议的服务地址。OpenAI / DeepSeek / 智谱 / SiliconFlow / 自建网关等。</p>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-llm-model">LLM_MODEL</label>
+          <input id="cfg-llm-model" type="text" placeholder="Qwen/Qwen3-8B" autocomplete="off" spellcheck="false" />
+          <p class="form-hint">模型标识符。可填 Qwen/Qwen3-8B、deepseek-chat、gpt-4o-mini 等。</p>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="settings-reset">Reset to defaults</button>
+          <div class="modal-footer-right">
+            <button type="button" class="btn-secondary" id="settings-cancel">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <main>
+    <section class="hero">
+      <div class="hero-eyebrow">AI · GitHub API · 实时</div>
+      <h1><span class="accent">GitHub</span> 仓库健康度，<br />一站式分析.</h1>
+      <p class="lede">输入公开仓库 URL，秒级获取 Star、Fork、语言分布、活跃度与 AI 综合评估。</p>
+
+      <form id="analyze-form" class="search-form" autocomplete="off">
+        <input
+          id="repo-url"
+          type="text"
+          name="url"
+          placeholder="https://github.com/owner/repo"
+          aria-label="GitHub 仓库 URL"
+          spellcheck="false"
+          required
+        />
+        <button type="submit" id="submit-btn">
+          <span class="btn-text">Analyze</span>
+          <span class="btn-spinner" hidden></span>
+        </button>
+      </form>
+
+      <div class="examples">
+        <span>examples →</span>
+        <a class="example-link" data-url="https://github.com/react/react">react/react</a>
+        <a class="example-link" data-url="https://github.com/vuejs/core">vuejs/core</a>
+        <a class="example-link" data-url="https://github.com/microsoft/vscode">microsoft/vscode</a>
+        <a class="example-link" data-url="https://github.com/torvalds/linux">torvalds/linux</a>
+      </div>
+
+      <div id="error-box" class="error-box" hidden></div>
+    </section>
+
+    <section id="loading" class="loading" hidden>
+      <div class="spinner"></div>
+      <p>Loading repository data…</p>
+    </section>
+
+    <section id="report" class="report" hidden>
+      <!-- 头部摘要 -->
+      <div class="card repo-header">
+        <img id="owner-avatar" class="avatar" src="" alt="owner" />
+        <div class="repo-meta">
+          <h2><a id="repo-fullname" href="#" target="_blank" rel="noopener"></a></h2>
+          <p id="repo-description" class="repo-desc"></p>
+          <div class="repo-tags" id="repo-tags"></div>
+          <div class="repo-extra" id="repo-extra"></div>
+        </div>
+      </div>
+
+      <!-- AI 综合评估（card-marketing-large 12px radius + Level 4 shadow） -->
+      <div class="card card-lg ai-review-card">
+        <h3>AI 综合评估 <span class="ai-badge">Beta</span></h3>
+        <div id="ai-loading" class="ai-loading">
+          <div class="spinner"></div>
+          <p>AI is analyzing the project. Please wait (~5-15s)…</p>
+        </div>
+        <div id="ai-error" class="ai-error" hidden>
+          <strong>AI 评估失败.</strong>
+          <p id="ai-error-msg"></p>
+          <button type="button" class="btn-retry" id="ai-retry">Try again</button>
+        </div>
+        <div id="ai-review-result" hidden>
+          <div class="ai-score-row">
+            <div class="ai-score-circle" id="ai-score-circle">
+              <span class="ai-score-num" id="ai-score">--</span>
+              <span class="ai-score-max">/100</span>
+            </div>
+            <div class="ai-summary" id="ai-summary"></div>
+          </div>
+          <div class="ai-detail">
+            <div class="ai-section">
+              <h4>💪 Strengths</h4>
+              <ul id="ai-strengths"></ul>
+            </div>
+            <div class="ai-section">
+              <h4>⚠️ Weaknesses</h4>
+              <ul id="ai-weaknesses"></ul>
+            </div>
+            <div class="ai-section">
+              <h4>💡 Suggestions</h4>
+              <ul id="ai-suggestions"></ul>
+            </div>
+          </div>
+          <div class="ai-meta" id="ai-meta"></div>
+        </div>
+      </div>
+
+      <!-- 关键指标卡片 -->
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" id="stat-stars">--</div>
+          <div class="stat-label">Stars</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🍴</div>
+          <div class="stat-value" id="stat-forks">--</div>
+          <div class="stat-label">Forks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👀</div>
+          <div class="stat-value" id="stat-watchers">--</div>
+          <div class="stat-label">Watchers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🐛</div>
+          <div class="stat-value" id="stat-issues">--</div>
+          <div class="stat-label">Open Issues</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📦</div>
+          <div class="stat-value" id="stat-releases">--</div>
+          <div class="stat-label">Recent Releases</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="stat-contribs">--</div>
+          <div class="stat-label">Contributors</div>
+        </div>
+      </div>
+
+      <!-- 图表区 -->
+      <div class="grid-2">
+        <div class="card">
+          <h3>Language breakdown.</h3>
+          <div class="chart-wrap chart-pie">
+            <div id="lang-chart"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Commit activity (12 mo).</h3>
+          <div class="chart-wrap chart-line">
+            <div id="commit-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Top 10 contributors.</h3>
+          <div class="chart-wrap chart-bar">
+            <div id="contrib-chart"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Issue health.</h3>
+          <div class="issue-stats">
+            <div>
+              <div class="big-num" id="issue-open">--</div>
+              <div class="big-label">Open</div>
+            </div>
+            <div>
+              <div class="big-num" id="issue-closed">--</div>
+              <div class="big-label">Closed</div>
+            </div>
+            <div>
+              <div class="big-num" id="issue-rate">--</div>
+              <div class="big-label">Close rate</div>
+            </div>
+          </div>
+          <div class="chart-wrap chart-donut">
+            <div id="issue-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Recent releases.</h3>
+        <ul id="release-list" class="release-list"></ul>
+      </div>
+
+      <p class="generated-at" id="generated-at"></p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <p>RepoInspector · GitHub 仓库健康度分析工具 · Powered by GitHub API &amp; SiliconFlow.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

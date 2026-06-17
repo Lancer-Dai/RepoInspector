@@ -1,0 +1,11 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+httpx==0.28.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+# openai 1.60+ 修复了与 httpx 0.28 的 proxies 参数不兼容问题
+openai>=1.60.0,<3
+
+# 打包为 exe（仅打包时需要，普通运行不需要）
+pyinstaller>=6.10
